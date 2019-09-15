@@ -55,34 +55,32 @@ regions = [
             'sa-east-1'
           ]
 
-def retrieve_ec2_instance_ids():
+def retrieve_ec2_instance_ids(region):
     result = {}
-    for region in regions:
-        try:
-            logging.info(f'processing EC2 region {region}')
-            ec2 = boto3.resource('ec2', region_name=region)
-            unterminated_instances = []
-            for x in ec2.instances.all():
-                if x.state['Name'] != 'terminated':
-                    unterminated_instances.append(x.id)
-            result[region] = unterminated_instances
-        except:
-            logging.warn(f'exception processing EC2 region {region}')
+    try:
+        logging.info(f'processing EC2 region {region}')
+        ec2 = boto3.resource('ec2', region_name=region)
+        unterminated_instances = []
+        for x in ec2.instances.all():
+            if x.state['Name'] != 'terminated':
+                unterminated_instances.append(x.id)
+        result[region] = unterminated_instances
+    except:
+        logging.warn(f'exception processing EC2 region {region}')
     return result
 
-def retrieve_unattached_volume_ids():
+def retrieve_unattached_volume_ids(region):
     result = {}
-    for region in regions:
-        try:
-            logging.info(f'processing volumes in region {region}')
-            ec2 = boto3.resource('ec2', region_name=region)
-            unattached_volumes = []
-            for x in ec2.volumes.all():
-                if not x.attachments:
-                    unattached_volumes.append(x.id)
-            result[region] = unattached_volumes
-        except:
-            logging.warn(f'exception processing volumes in region {region}')
+    try:
+        logging.info(f'processing volumes in region {region}')
+        ec2 = boto3.resource('ec2', region_name=region)
+        unattached_volumes = []
+        for x in ec2.volumes.all():
+            if not x.attachments:
+                unattached_volumes.append(x.id)
+        result[region] = unattached_volumes
+    except:
+        logging.warn(f'exception processing volumes in region {region}')
     return result
 
 
@@ -94,4 +92,6 @@ def report(serviceName, resultMap):
 
 
 if __name__ == "__main__":
-    report('EC2', retrieve_ec2_instance_ids())
+    for region in regions:
+        report('EC2', retrieve_ec2_instance_ids(region))
+        report('Volumes', retrieve_unattached_volume_ids(region))
