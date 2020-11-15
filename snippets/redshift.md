@@ -1,6 +1,6 @@
 # Data Catalog / Finding Stuff
 
-## Table/schema name lookups
+## Table/schema lookups
 
 Lookup by schema:
 
@@ -100,7 +100,7 @@ where   table_name like '%SOMETHING%';
 
 # Queries and Tuning
 
-## Failed queries after a given date/time
+## Failed queries since a given date/time
 
 ```
 select  starttime, userid, substring(querytxt, 1, 120)
@@ -139,7 +139,7 @@ order by elapsed desc
 limit 20;
 ```
 
-# Longest running queries by user, last hour
+## Longest running queries by user, last hour
 
 Note that this excludes fetches, which are largely dependent on client and network.
 
