@@ -1,16 +1,34 @@
 # Data Catalog / Finding Stuff
 
-## Schema holding a specific table / column
+## Table/schema name lookups
+
+Lookup by schema:
 
 ```
-select  distinct ns.nspname
-from    pg_class t,
-        pg_attribute a,
-        pg_namespace ns
-where   t.relname = 'TBL'
-and     a.attname = 'COL'
-and     a.attrelid = t.oid
-and     ns.oid = t.relnamespace;
+select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
+from    SVV_TABLE_INFO ti 
+where   ti.schema like 'X'
+order   by 1, 2;
+```
+
+Lookup by table:
+
+```
+select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
+from    SVV_TABLE_INFO ti 
+where   ti.table like 'X'
+order   by 1, 2;
+```
+
+Lookup by user:
+
+```
+select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
+from    PG_USER pgu
+join    PG_NAMESPACE pgn on pgn.nspowner = pgu.usesysid
+join    SVV_TABLE_INFO ti on ti.schema = pgn.nspname
+where   pgu.usename like 'X'
+order   by 1, 2;
 ```
 
 
@@ -49,9 +67,19 @@ join    pg_class pgc on pgc.oid = pga.attrelid
 join    pg_namespace pgn on pgn.oid = pgc.relnamespace
 where   pgc.relkind = 'r'
 and     pga.attnum > 0
-and     schema_name like '%X%'
-and     table_name like '%X%'
+and     schema_name like 'X'
+and     table_name like 'X'
 order   by pgn.nspname, pgc.relname, pga.attnum
+```
+
+## External tables
+
+```
+select  schemaname, tablename, columnname, external_type, is_nullable
+from    SVV_EXTERNAL_COLUMNS
+where   schemaname like 'X'
+and     tablename like 'X'
+order by schemaname, tablename, columnnum;
 ```
 
 
@@ -67,15 +95,6 @@ where   view_name like '%SOMETHING%';
 select  *
 from    information_schema.view_table_usage
 where   table_name like '%SOMETHING%';
-```
-
-
-## Identify user
-
-```
-select  *
-from    pg_user
-where   usesysid = 103;
 ```
 
 
@@ -120,7 +139,9 @@ order by elapsed desc
 limit 20;
 ```
 
-# Longest running queries by user, last 15 minutes
+# Longest running queries by user, last hour
+
+Note that this excludes fetches, which are largely dependent on client and network.
 
 ```
 with    recent_queries(query_id,username,starttime,endtime,elapsed,querytxt) as
@@ -133,7 +154,7 @@ with    recent_queries(query_id,username,starttime,endtime,elapsed,querytxt) as
                 q.querytxt
         from    stl_query q
         join    pg_user u on u.usesysid = q.userid
-        where   q.endtime > dateadd(minute, -15, sysdate)
+        where   q.endtime > dateadd(minute, -60, sysdate)
         and     q.querytxt not like 'fetch%'
         )
 select  query_id, username, starttime, endtime, elapsed, substring(querytxt, 1, 96)
@@ -148,12 +169,12 @@ where   (username, elapsed) in
 order   by username;
 
 
-## Execution plan
+## Historical query plans
 
 ```
 select  parentid, nodeid, trim(plannode)
-from    stl_explain
-where   query = 31438760
+from    STL_EXPLAIN
+where   query = X
 order by parentid, nodeid;
 ```
 
@@ -210,6 +231,14 @@ limit 20;
 
 
 # Misc
+
+## Identify user
+
+```
+select  *
+from    pg_user
+where   usesysid = X;
+```
 
 ## Count of sessions by user since given time
 
