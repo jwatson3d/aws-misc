@@ -2,7 +2,10 @@
 
 ## Table/schema lookups
 
-Lookup by schema:
+Note: all of these use `SVV_TABLE_INFO`, which only contains rows for tables
+that have data (it joins to the blocklist).
+
+By schema:
 
 ```
 select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
@@ -11,7 +14,7 @@ where   ti.schema like 'X'
 order   by 1, 2;
 ```
 
-Lookup by table:
+By table:
 
 ```
 select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
@@ -20,7 +23,7 @@ where   ti.table like 'X'
 order   by 1, 2;
 ```
 
-Lookup by user:
+By user:
 
 ```
 select  ti.schema, ti.table, ti.diststyle, ti.sortkey1, ti.tbl_rows 
@@ -67,18 +70,30 @@ join    pg_class pgc on pgc.oid = pga.attrelid
 join    pg_namespace pgn on pgn.oid = pgc.relnamespace
 where   pgc.relkind = 'r'
 and     pga.attnum > 0
-and     schema_name like 'X'
-and     table_name like 'X'
-order   by pgn.nspname, pgc.relname, pga.attnum
+and     schema_name like '%XXX%'
+and     table_name like '%XXX%'
+order   by schema_name, table_name, pga.attnum;
 ```
 
-## External tables
+
+## External Schema Lookups
+
+Tables by name:
+
+```
+select  schemaname, tablename, tabletype, location
+from    SVV_EXTERNAL_TABLES
+where   tablename like '%X%'
+order by schemaname, tablename;
+```
+
+Columns by table:
 
 ```
 select  schemaname, tablename, columnname, external_type, is_nullable
 from    SVV_EXTERNAL_COLUMNS
-where   schemaname like 'X'
-and     tablename like 'X'
+where   schemaname = 'X'
+and     tablename = 'X'
 order by schemaname, tablename, columnnum;
 ```
 
