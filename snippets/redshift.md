@@ -119,7 +119,7 @@ where   table_name like '%SOMETHING%';
 
 ```
 select  starttime, userid, substring(querytxt, 1, 120)
-from    stl_query
+from    STL_QUERY
 where   aborted = 1
 and     starttime > '2015-07-10 18:00:00'
 order by starttime;
@@ -147,8 +147,8 @@ order by sum(qr.bytes) desc;
 select  q.query, trim(u.usename) as user, q.starttime, q.endtime,
         datediff(seconds, q.starttime, q.endtime) as elapsed,
         substring(q.querytxt, 1, 96)
-from    stl_query q
-join    pg_user u on u.usesysid = q.userid
+from    STL_QUERY q
+join    PG_USER u on u.usesysid = q.userid
 where   q.starttime > dateadd(day, -1, sysdate)
 order by elapsed desc
 limit 20;
@@ -156,7 +156,8 @@ limit 20;
 
 ## Longest running queries by user, last hour
 
-Note that this excludes fetches, which are largely dependent on client and network.
+Note that this excludes fetches, which are largely dependent on client and network
+(and often indicate a query wrapped in a cursor; see below).
 
 ```
 with    recent_queries(query_id,username,starttime,endtime,elapsed,querytxt) as
@@ -167,8 +168,8 @@ with    recent_queries(query_id,username,starttime,endtime,elapsed,querytxt) as
                 q.endtime,
                 datediff(millisecond, q.starttime, q.endtime) as elapsed,
                 q.querytxt
-        from    stl_query q
-        join    pg_user u on u.usesysid = q.userid
+        from    STL_QUERY q
+        join    PG_USER u on u.usesysid = q.userid
         where   q.endtime > dateadd(minute, -60, sysdate)
         and     q.querytxt not like 'fetch%'
         )
@@ -182,6 +183,71 @@ where   (username, elapsed) in
         order   by 2 desc
         )
 order   by username;
+
+
+## Queries with utility text
+
+Cursor definitions are not included in `STL_QUERY`; it simply reports fetches from that
+cursor. To get the definition, you have to join to `STL_UTILITYTEXT`. This latter table
+is keyed by transaction ID and statement start time, not query ID. It also splits the
+text over multiple rows, which must be separately aggregated by statement and then by
+transaction.
+
+Version 1: expensive queries in past hour:
+
+```
+with
+RAW_UTILITY_TEXT (xid, starttime, command) as
+        (
+        select  xid,
+                starttime,
+                trim(listagg(text) within group (order by sequence))
+        from    STL_UTILITYTEXT
+        group   by xid, starttime
+        ),
+COOKED_UTILITY_TEXT (xid, commands) as
+        (
+        select  xid,
+                listagg(command, '\n') within group (order by starttime) as utilitytxt
+        from    RAW_UTILITY_TEXT
+        group   by xid
+        )
+select  q.query as query_id,
+        q.xid as xid,
+        trim(u.usename) as username,
+        q.starttime as starttime,
+        q.endtime as endtime,
+        datediff(second, q.starttime, q.endtime) elapsed,
+        substring(q.querytxt, 1, 48) as query_text,
+        substring(t.commands, 1, 48) as commands
+from    STL_QUERY q
+join    PG_USER u on u.usesysid = q.userid
+left join COOKED_UTILITY_TEXT t on t.xid = q.xid
+where   q.starttime > dateadd(minute, -60, sysdate)
+and     elapsed > 10
+order  by query_id, xid;
+```
+
+Version 2: detail (for when you know the query ID):
+
+```
+with
+RAW_UTILITY_TEXT (xid, starttime, command) as
+        (
+        select  xid,
+                starttime,
+                trim(listagg(text) within group (order by sequence))
+        from    STL_UTILITYTEXT
+        group   by xid, starttime
+        )
+select  q.xid as xid,
+        t.starttime,
+        trim(t.command)
+from    STL_QUERY q
+left join RAW_UTILITY_TEXT t on t.xid = q.xid
+where   q.query = X
+order   by t.starttime;
+```
 
 
 ## Historical query plans
@@ -251,7 +317,7 @@ limit 20;
 
 ```
 select  *
-from    pg_user
+from    PG_USER
 where   usesysid = X;
 ```
 
